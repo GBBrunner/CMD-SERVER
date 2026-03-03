@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const port = 3000;
+app.use(express.json());
 let nextUserID = 1;
 app.get('/', (req, res) => {
   const userID = nextUserID++;
@@ -22,8 +23,10 @@ app.get('/', (req, res) => {
   </html>`);
 });
 app.post('/w/:userID', (req, res) => {
-  console.log('POST /w', req.params.userID);
-  res.send('POST /w');
+  console.log('POST /w', req.params.userID, req.body);
+  const { from, msg } = req.body || {};
+  console.log(`Whisper to ${req.params.userID} from ${from}: ${msg}`);
+  res.send('POST /w received');
 });
 
 app.listen(port, () => {

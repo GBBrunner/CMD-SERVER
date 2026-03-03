@@ -1,0 +1,19 @@
+### Send whisper to user 1
+POST http://localhost:4000/w
+Content-Type: application/json
+
+{
+  "userID": 1,
+  "from": "Tester",
+  "msg": "Hello user #1 — whisper test"
+}
+
+### Alternative: send to user 1 with different text
+POST http://localhost:4000/w
+Content-Type: application/json
+
+{
+  "userID": 1,
+  "from": "Alice",
+  "msg": "Second test message"
+}

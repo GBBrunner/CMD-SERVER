@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const port = 4000;
+app.use(express.json());
 app.get('/', (req, res) => {
   res.send(`<!doctype html>
   <html>
@@ -18,9 +19,23 @@ app.get('/', (req, res) => {
     </body>
   </html>`);
 });
-app.post('/w' , (req, res) => {
-  console.log('POST /w');
-  res.send('POST /w');
+app.post('/w', async (req, res) => {
+  console.log('POST /w', req.body);
+  const { userID, msg, from } = req.body || {};
+  if (!userID) return res.status(400).send('Missing userID');
+  const targetUrl = `http://localhost:3000/w/${userID}`;
+  try {
+    const forwardRes = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, msg })
+    });
+    const text = await forwardRes.text();
+    res.send(`Forwarded to client: ${text}`);
+  } catch (err) {
+    console.error('Error forwarding to client', err);
+    res.status(500).send('Error forwarding to client');
+  }
 });
 app.listen(port, () => {
   console.log(`Listening at http://localhost:${port}`);
