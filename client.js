@@ -1,8 +1,8 @@
 const express = require('express');
 const app = express();
-const port = 3000;
 app.use(express.json());
 let nextUserID = 1;
+const port = 3000 + nextUserID;
 app.get('/', (req, res) => {
   const userID = nextUserID++;
   res.set('X-User-ID', String(userID));
