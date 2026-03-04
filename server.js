@@ -5,6 +5,10 @@ const port = 4000;
 app.use(express.json());
 let nextUserID = 1;
 
+// username state
+const usernamesById = {};     // id -> username
+const idsByUsername = {};     // username -> id
+
 function commandHelperFunction(command, getRecipientIDs) {
   app.post(`/${command}`, async (req, res) => {
     const { userID, msg, from } = req.body;
@@ -43,16 +47,31 @@ function commandHelperFunction(command, getRecipientIDs) {
 
 app.get('/register', (req, res) => {
   const assignedID = nextUserID++;
+  const idKey = String(assignedID);
+  const defaultName = `User${assignedID}`;
+
+  // initialise default username based on ID
+  usernamesById[idKey] = defaultName;
+  idsByUsername[defaultName] = idKey;
+
   res.json({ userID: assignedID });
 });
 
+// w: whisper to a single user, by id or username
 commandHelperFunction('w', ({ userID }) => {
-  const targetID = Number(userID);
-  if (Number.isNaN(targetID)) return [];
-  return [targetID];
+  if (!userID) return [];
+
+  const numeric = Number(userID);
+  if (!Number.isNaN(numeric)) {
+    return [numeric];
+  }
+
+  const resolved = idsByUsername[userID];
+  if (!resolved) return [];
+  return [Number(resolved)];
 });
 
-
+// m: message all users except sender
 commandHelperFunction('m', ({ from, nextUserID }) => {
   const ids = [];
   for (let id = 1; id < nextUserID; id++) {
@@ -61,6 +80,44 @@ commandHelperFunction('m', ({ from, nextUserID }) => {
     }
   }
   return ids;
+});
+
+// username: get or set your username
+app.post('/username', (req, res) => {
+  const { from, msg } = req.body || {};
+
+  if (!from) {
+    return res.status(400).send('Missing user id');
+  }
+
+  const idKey = String(from);
+  const proposed = (msg || '').trim();
+
+  // No value: show current username
+  if (!proposed) {
+    const current = usernamesById[idKey];
+    if (!current) {
+      return res.send('No username set');
+    }
+    return res.send(`Your username is ${current}`);
+  }
+
+  // Check if username already taken by another user
+  const existingOwner = idsByUsername[proposed];
+  if (existingOwner && String(existingOwner) !== idKey) {
+    return res.status(400).send('Username already taken');
+  }
+
+  // Update mappings
+  const old = usernamesById[idKey];
+  if (old && old !== proposed) {
+    delete idsByUsername[old];
+  }
+
+  usernamesById[idKey] = proposed;
+  idsByUsername[proposed] = idKey;
+
+  return res.send(`Username set to ${proposed}`);
 });
 
 app.listen(port, () => {console.log(`Server running on port ${port}`);});

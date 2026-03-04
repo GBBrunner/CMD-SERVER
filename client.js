@@ -50,6 +50,7 @@ async function init() {
         console.log('Commands:');
         console.log('  w [id] [message]   Whisper a user');
         console.log('  m [message]        Message all users');
+        console.log('  username [name]    Get or set your username');
         console.log('  exit               Quit');
         rl.prompt();
         return;
@@ -92,9 +93,24 @@ async function init() {
         } catch (e) {
           console.error('Error: Server unreachable.');
         }
-      } else if(cmd === 'username') {
-        console.clear();
-      }else if (line === 'exit') {
+      } else if (cmd === 'username') {
+        const newName = rest.join(' ').trim();
+        try {
+          const body = newName
+            ? { from: myID, msg: newName }
+            : { from: myID };
+
+          const res = await fetch('http://localhost:4000/username', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          const text = await res.text();
+          console.log(text);
+        } catch (e) {
+          console.error('Error: Server unreachable.');
+        }
+      } else if (line === 'exit') {
         process.exit(0);
       } else {
         console.error(invalidMsg);
