@@ -51,6 +51,7 @@ async function init() {
         console.log('  w [id] [message]   Whisper a user');
         console.log('  m [message]        Message all users');
         console.log('  username [name]    Get or set your username');
+        console.log('  clientlist         List all client usernames');
         console.log('  exit               Quit');
         rl.prompt();
         return;
@@ -105,6 +106,14 @@ async function init() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
           });
+          const text = await res.text();
+          console.log(text);
+        } catch (e) {
+          console.error('Error: Server unreachable.');
+        }
+      } else if (cmd === 'clientlist') {
+        try {
+          const res = await fetch('http://localhost:4000/clientlist');
           const text = await res.text();
           console.log(text);
         } catch (e) {

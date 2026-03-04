@@ -120,4 +120,18 @@ app.post('/username', (req, res) => {
   return res.send(`Username set to ${proposed}`);
 });
 
+// clientlist: list all registered client usernames
+app.get('/clientlist', (req, res) => {
+  const names = [];
+  for (let id = 1; id < nextUserID; id++) {
+    const idKey = String(id);
+    const name = usernamesById[idKey] || `User${id}`;
+    names.push(name);
+  }
+  if (names.length === 0) {
+    return res.send('No clients.');
+  }
+  res.send(names.join('\n'));
+});
+
 app.listen(port, () => {console.log(`Server running on port ${port}`);});
