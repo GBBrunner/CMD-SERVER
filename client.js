@@ -24,7 +24,7 @@ async function init() {
       const { from, msg } = req.body;
       console.log(`\n[WHISPER] User ${from}: ${msg}`);
       rl.prompt(); // Keep the prompt visible
-      res.send('ACK');
+      res.send('ok');
     });
 
     // Broadcast receiver
@@ -32,7 +32,7 @@ async function init() {
       const { from, msg } = req.body;
       console.log(`\n[MESSAGE] User ${from}: ${msg}`);
       rl.prompt();
-      res.send('ACK');
+      res.send('ok');
     });
 
     app.listen(port, () => {
@@ -92,7 +92,9 @@ async function init() {
         } catch (e) {
           console.error('Error: Server unreachable.');
         }
-      } else if (line === 'exit') {
+      } else if(cmd === 'username') {
+        console.clear();
+      }else if (line === 'exit') {
         process.exit(0);
       } else {
         console.error(invalidMsg);

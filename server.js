@@ -52,6 +52,7 @@ commandHelperFunction('w', ({ userID }) => {
   return [targetID];
 });
 
+
 commandHelperFunction('m', ({ from, nextUserID }) => {
   const ids = [];
   for (let id = 1; id < nextUserID; id++) {
