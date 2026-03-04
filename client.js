@@ -1,34 +1,88 @@
 const express = require('express');
+const readline = require('node:readline');
 const app = express();
 app.use(express.json());
-let nextUserID = 1;
-const port = 3000 + nextUserID;
-app.get('/', (req, res) => {
-  const userID = nextUserID++;
-  res.set('X-User-ID', String(userID));
-  res.send(`<!doctype html>
-  <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1">
-      <title>CLIENT</title>
-      <style>
-        html,body{height:100%;margin:0}
-        body{background:darkcyan;color:#fff;display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif}
-      </style>
-    </head>
-    <body>
-      <h1>CLIENT SIDE — ID: ${userID}</h1>
-    </body>
-  </html>`);
-});
-app.post('/w/:userID', (req, res) => {
-  console.log('POST /w', req.params.userID, req.body);
-  const { from, msg } = req.body || {};
-  console.log(`Whisper to ${req.params.userID} from ${from}: ${msg}`);
-  res.send('POST /w received');
+
+let myID = null;
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  prompt: '> '
 });
 
-app.listen(port, () => {
-  console.log(`Listening at http://localhost:${port}`);
-});
+async function init() {
+  try {
+    // 1. Register with the central server
+    const response = await fetch('http://localhost:4000/register');
+    const data = await response.json();
+    myID = data.userID;
+    const port = 3000 + myID;
+
+    // 2. Setup message receiver
+    app.post('/w/:userID', (req, res) => {
+      const { from, msg } = req.body;
+      console.log(`\n[WHISPER] User ${from}: ${msg}`);
+      rl.prompt(); // Keep the prompt visible
+      res.send('ACK');
+    });
+
+    // Broadcast receiver
+    app.post('/m/:userID', (req, res) => {
+      const { from, msg } = req.body;
+      console.log(`\n[MESSAGE] User ${from}: ${msg}`);
+      rl.prompt();
+      res.send('ACK');
+    });
+
+    app.listen(port, () => {
+      console.log(`Welcome, User ${myID} (Port ${port})`);
+      console.log(`Usage: w [id] [message]`);
+      rl.prompt();
+    });
+
+    // 3. Handle Interactive Input
+    rl.on('line', async (line) => {
+      const parts = line.trim().split(' ');
+      const [cmd, target, ...msgParts] = parts;
+      const msg = msgParts.join(' ');
+
+      if (cmd === 'w' && target && msg) {
+        try {
+          const res = await fetch('http://localhost:4000/w', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userID: target, from: myID, msg: msg })
+          });
+          const status = await res.text();
+          console.log(`Status: ${status}`);
+        } catch (e) {
+          console.log('Error: Server unreachable.');
+        }
+      } else if (cmd === 'm' && msg) {
+        try {
+          const res = await fetch('http://localhost:4000/m', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from: myID, msg })
+          });
+          const status = await res.text();
+          console.log(`Status: ${status}`);
+        } catch (e) {
+          console.log('Error: Server unreachable.');
+        }
+      } else if (line === 'exit') {
+        process.exit(0);
+      } else {
+        console.log('Invalid command. Use: w [id] [message]');
+      }
+      rl.prompt();
+    });
+
+  } catch (e) {
+    console.error('Failed to connect to central server.');
+    process.exit(1);
+  }
+}
+
+init();

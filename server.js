@@ -2,41 +2,64 @@ const express = require('express');
 const app = express();
 const port = 4000;
 app.use(express.json());
-app.get('/', (req, res) => {
-  res.send(`<!doctype html>
-  <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1">
-      <title>SERVER</title>
-      <style>
-        html,body{height:100%;margin:0}
-        body{background:navy;color:#fff;display:flex;align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif}
-      </style>
-    </head>
-    <body>
-      <h1>SERVER SIDE</h1>
-    </body>
-  </html>`);
+let nextUserID = 1;
+
+function commandHelperFunction(command){
+  app.post(`/${command}`, (req, res) => {
+    const targetPort = 3000 + id;
+
+  });
+}
+app.get('/register', (req, res) => {
+  const assignedID = nextUserID++;
+  res.json({ userID: assignedID });
 });
+
 app.post('/w', async (req, res) => {
-  console.log('POST /w', req.body);
   const { userID, msg, from } = req.body || {};
-  if (!userID) return res.status(400).send('Missing userID');
-  const targetUrl = `http://localhost:3000/w/${userID}`;
+  const targetPort = 3000 + parseInt(userID);
+  const targetUrl = `http://localhost:${targetPort}/w/${userID}`;
+
   try {
     const forwardRes = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, msg })
     });
-    const text = await forwardRes.text();
-    res.send(`Forwarded to client: ${text}`);
+    res.send(await forwardRes.text());
   } catch (err) {
-    console.error('Error forwarding to client', err);
-    res.status(500).send('Error forwarding to client');
+    res.status(404).send(`User ${userID} is offline.`);
   }
 });
-app.listen(port, () => {
-  console.log(`Listening at http://localhost:${port}`);
+
+// Broadcast message to all registered clients (except sender)
+app.post('/m', async (req, res) => {
+  const { from, msg } = req.body || {};
+  const results = [];
+
+  // iterate over assigned IDs (1 .. nextUserID-1)
+  const promises = [];
+  for (let id = 1; id < nextUserID; id++) {
+    if (String(id) === String(from)) continue; // skip sender
+    const targetPort = 3000 + id;
+    const targetUrl = `http://localhost:${targetPort}/m/${id}`;
+    const p = fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, msg })
+    })
+      .then(r => ({ id, ok: r.ok }))
+      .catch(() => ({ id, ok: false }));
+    promises.push(p);
+  }
+
+  const settled = await Promise.all(promises);
+  const failed = settled.filter(s => !s.ok).map(s => s.id);
+  if (failed.length === 0) {
+    res.send('Broadcast delivered');
+  } else {
+    res.status(206).send(`Broadcast partial: failed to deliver to ${failed.join(',')}`);
+  }
 });
+
+app.listen(port, () => console.log(`Server running on port ${port}`));
