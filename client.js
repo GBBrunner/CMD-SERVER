@@ -37,17 +37,32 @@ async function init() {
 
     app.listen(port, () => {
       console.log(`Welcome, User ${myID} (Port ${port})`);
-      console.log(`Usage: w [id] [message]`);
       rl.prompt();
     });
 
     // 3. Handle Interactive Input
     rl.on('line', async (line) => {
-      const parts = line.trim().split(' ');
-      const [cmd, target, ...msgParts] = parts;
-      const msg = msgParts.join(' ');
+      const parts = line.trim().split(' ').filter(Boolean);
+      const [cmd, ...rest] = parts;
+      const invalidMsg = 'Invalid command, do /help for command list';
 
-      if (cmd === 'w' && target && msg) {
+      if (cmd === '/help') {
+        console.log('Commands:');
+        console.log('  w [id] [message]   Whisper a user');
+        console.log('  m [message]        Message all users');
+        console.log('  exit               Quit');
+        rl.prompt();
+        return;
+      }
+
+      if (cmd === 'w') {
+        const target = rest[0];
+        const msg = rest.slice(1).join(' ');
+        if (!target || !msg) {
+          console.log(invalidMsg);
+          rl.prompt();
+          return;
+        }
         try {
           const res = await fetch('http://localhost:4000/w', {
             method: 'POST',
@@ -57,9 +72,15 @@ async function init() {
           const status = await res.text();
           console.log(`Status: ${status}`);
         } catch (e) {
-          console.log('Error: Server unreachable.');
+          console.error('Error: Server unreachable.');
         }
-      } else if (cmd === 'm' && msg) {
+      } else if (cmd === 'm') {
+        const msg = rest.join(' ');
+        if (!msg) {
+          console.error(invalidMsg);
+          rl.prompt();
+          return;
+        }
         try {
           const res = await fetch('http://localhost:4000/m', {
             method: 'POST',
@@ -69,12 +90,12 @@ async function init() {
           const status = await res.text();
           console.log(`Status: ${status}`);
         } catch (e) {
-          console.log('Error: Server unreachable.');
+          console.error('Error: Server unreachable.');
         }
       } else if (line === 'exit') {
         process.exit(0);
       } else {
-        console.log('Invalid command. Use: w [id] [message]');
+        console.error(invalidMsg);
       }
       rl.prompt();
     });
