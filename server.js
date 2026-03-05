@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const app = express();
 const port = 4000;
@@ -133,5 +134,38 @@ app.get('/clientlist', (req, res) => {
   }
   res.send(names.join('\n'));
 });
+app.post('/kick', (req, res) => {
+  const { userID, msg, from, reason } = req.body || {};
+  if (!from || !msg || !userID) {
+    return res.status(400).send('Missing required fields: from, msg, userID');
+  }
 
+  if (msg !== process.env.ADMIN_PASSWORD) {
+    return res.status(403).send('Incorrect admin password.');
+  }
+
+  // Resolve numeric id from either numeric id or username
+  let numeric = Number(userID);
+  if (Number.isNaN(numeric)) {
+    const resolved = idsByUsername[userID];
+    if (!resolved) return res.status(404).send('User not found');
+    numeric = Number(resolved);
+  }
+
+  const targetId = numeric;
+  const targetUrl = `http://localhost:${3000 + targetId}/kick/${targetId}`;
+
+  fetch(targetUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, reason })
+  })
+    .then(async (r) => {
+      const text = await r.text();
+      return res.send(text || 'User kicked successfully.');
+    })
+    .catch(() => {
+      return res.status(404).send(`User ${targetId} is offline or unreachable.`);
+    });
+});
 app.listen(port, () => {console.log(`Server running on port ${port}`);});

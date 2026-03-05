@@ -5,13 +5,25 @@ app.use(express.json());
 
 let myID = null;
 
+async function serverRequest(path, method = 'GET', body = null) {
+  try {
+    const url = `http://localhost:4000${path}`;
+    const options = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) options.body = JSON.stringify(body);
+    const res = await fetch(url, options);
+    return await res.text();
+  } catch (e) {
+    throw new Error('Server unreachable.');
+  }
+}
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
   prompt: '> '
 });
 
-async function init() {
+async function runClient() {
   try {
     // 1. Register with the central server
     const response = await fetch('http://localhost:4000/register');
@@ -19,7 +31,7 @@ async function init() {
     myID = data.userID;
     const port = 3000 + myID;
 
-    // 2. Setup message receiver
+    // Privatly whisper to a single user, by id or username
     app.post('/w/:userID', (req, res) => {
       const { from, msg } = req.body;
       console.log(`\n[WHISPER] User ${from}: ${msg}`);
@@ -27,7 +39,7 @@ async function init() {
       res.send('ok');
     });
 
-    // Broadcast receiver
+    // Send a message to all clients connected
     app.post('/m/:userID', (req, res) => {
       const { from, msg } = req.body;
       console.log(`\n[MESSAGE] User ${from}: ${msg}`);
@@ -35,6 +47,14 @@ async function init() {
       res.send('ok');
     });
 
+    // Handle server-initiated kick
+    app.post('/kick/:userID', (req, res) => {
+      const { from, reason } = req.body || {};
+      console.log(`\n[KICK] You were kicked by User ${from}${reason ? `: ${reason}` : ''} Exiting...`);
+      res.send('kicked');
+      process.exit(0);
+    });
+    // Port is 3000 + userID, so we can have multiple clients on the same machine
     app.listen(port, () => {
       console.log(`Welcome, User ${myID} (Port ${port})`);
       rl.prompt();
@@ -53,11 +73,13 @@ async function init() {
         console.log('  username [name]    Get or set your username');
         console.log('  clientlist         List all client usernames');
         console.log('  exit               Quit');
+        console.log('  kick [id] [admin password] Kick a user (admin only)');
         rl.prompt();
         return;
       }
 
       if (cmd === 'w') {
+        // Take the first word as the recipient, and the rest as the message
         const target = rest[0];
         const msg = rest.slice(1).join(' ');
         if (!target || !msg) {
@@ -66,12 +88,7 @@ async function init() {
           return;
         }
         try {
-          const res = await fetch('http://localhost:4000/w', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userID: target, from: myID, msg: msg })
-          });
-          const status = await res.text();
+          const status = await serverRequest('/w', 'POST', { userID: target, from: myID, msg: msg });
           console.log(`Status: ${status}`);
         } catch (e) {
           console.error('Error: Server unreachable.');
@@ -84,12 +101,22 @@ async function init() {
           return;
         }
         try {
-          const res = await fetch('http://localhost:4000/m', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from: myID, msg })
-          });
-          const status = await res.text();
+          const status = await serverRequest('/m', 'POST', { from: myID, msg });
+          console.log(`Status: ${status}`);
+        } catch (e) {
+          console.error('Error: Server unreachable.');
+        }
+      } else if (cmd === 'kick') {
+        const target = rest[0];
+        const password = rest[1];
+        const kickMsg = rest.slice(2).join(' ') || '';
+        if (!target || !password) {
+          console.error(invalidMsg);
+          rl.prompt();
+          return;
+        }
+        try {
+          const status = await serverRequest('/kick', 'POST', { userID: target, from: myID, msg: password, reason: kickMsg });
           console.log(`Status: ${status}`);
         } catch (e) {
           console.error('Error: Server unreachable.');
@@ -101,20 +128,14 @@ async function init() {
             ? { from: myID, msg: newName }
             : { from: myID };
 
-          const res = await fetch('http://localhost:4000/username', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
-          const text = await res.text();
+          const text = await serverRequest('/username', 'POST', body);
           console.log(text);
         } catch (e) {
           console.error('Error: Server unreachable.');
         }
       } else if (cmd === 'clientlist') {
         try {
-          const res = await fetch('http://localhost:4000/clientlist');
-          const text = await res.text();
+          const text = await serverRequest('/clientlist');
           console.log(text);
         } catch (e) {
           console.error('Error: Server unreachable.');
@@ -133,4 +154,4 @@ async function init() {
   }
 }
 
-init();
+runClient();
